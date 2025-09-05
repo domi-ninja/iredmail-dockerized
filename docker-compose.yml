@@ -1,12 +1,12 @@
 services:
   iredmail:
-    image: iredmail/mariadb:nightly
+    image: iredmail/mariadb:stable  # Use stable for production
     container_name: iredmail
-    hostname: mail.local.test
+    hostname: mail.datenschrauber.ch
     env_file:
-      - ./iredmail-docker.conf
+      - ./iredmail-docker.prod.conf
     ports:
-      # Mail ports only - HTTP/HTTPS handled by Traefik
+      # Only mail ports - HTTP/HTTPS handled by Traefik
       - "25:25"     # SMTP
       - "465:465"   # SMTPS
       - "587:587"   # Submission
@@ -16,32 +16,34 @@ services:
       - "995:995"   # POP3S
       - "4190:4190" # ManageSieve
     expose:
-      - "80"  # Exposed internally for Traefik
-      - "443" # Exposed internally for Traefik
+      - "80"  # Exposed internally for Traefik only
     labels:
       # Enable Traefik
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
       
       # HTTP Router - redirect to HTTPS
-      - traefik.http.routers.iredmail-web.rule=Host(`mail.local.test`)
+      - traefik.http.routers.iredmail-web.rule=Host(`mail.datenschrauber.ch`) || Host(`webmail.datenschrauber.ch`) || Host(`admin.datenschrauber.ch`)
       - traefik.http.routers.iredmail-web.entrypoints=web
       - traefik.http.routers.iredmail-web.middlewares=redirect-to-https@file
       
-      # HTTPS Router for main domain
-      - traefik.http.routers.iredmail-websecure.rule=Host(`mail.local.test`)
+      # HTTPS Router for mail subdomain
+      - traefik.http.routers.iredmail-websecure.rule=Host(`mail.datenschrauber.ch`) || Host(`webmail.datenschrauber.ch`) || Host(`admin.datenschrauber.ch`)
       - traefik.http.routers.iredmail-websecure.entrypoints=websecure
       - traefik.http.routers.iredmail-websecure.tls=true
       - traefik.http.routers.iredmail-websecure.tls.certresolver=letsencrypt
-      - traefik.http.routers.iredmail-websecure.service=iredmail-websecure
-      - traefik.http.services.iredmail-websecure.loadbalancer.server.port=80
+      - traefik.http.routers.iredmail-websecure.service=iredmail-service
+      - traefik.http.services.iredmail-service.loadbalancer.server.port=80
       
-      # Additional routes for webmail and admin
-      - traefik.http.routers.iredmail-admin.rule=Host(`mail.local.test`) && PathPrefix(`/iredadmin`)
-      - traefik.http.routers.iredmail-admin.entrypoints=websecure
-      - traefik.http.routers.iredmail-admin.tls=true
-      - traefik.http.routers.iredmail-admin.tls.certresolver=letsencrypt
-      - traefik.http.routers.iredmail-admin.service=iredmail-websecure
+      # Security headers
+      - traefik.http.middlewares.iredmail-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.iredmail-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.iredmail-headers.headers.stsPreload=true
+      - traefik.http.middlewares.iredmail-headers.headers.forceSTSHeader=true
+      - traefik.http.middlewares.iredmail-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.iredmail-headers.headers.browserXssFilter=true
+      - traefik.http.routers.iredmail-websecure.middlewares=iredmail-headers
+      
     volumes:
       - ./data/backup-mysql:/var/vmail/backup/mysql
       - ./data/mailboxes:/var/vmail/vmail1
@@ -64,6 +66,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:
