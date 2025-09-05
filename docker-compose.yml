@@ -1,7 +1,7 @@
 services:
   iredmail:
     image: iredmail/mariadb:stable  # Use stable for production
-    container_name: iredmail
+    # container_name removed - let Dokploy manage container naming
     hostname: mail.datenschrauber.ch
     env_file:
       - ./iredmail-docker.conf
