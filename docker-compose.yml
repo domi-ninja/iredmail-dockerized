@@ -4,7 +4,7 @@ services:
     container_name: iredmail
     hostname: mail.datenschrauber.ch
     env_file:
-      - ./iredmail-docker.prod.conf
+      - ./iredmail-docker.conf
     ports:
       # Only mail ports - HTTP/HTTPS handled by Traefik
       - "25:25"     # SMTP
